@@ -11,7 +11,7 @@ https://www.bittorrent.org/beps/bep_0003.html#bencoding
 
 ## Usage
 Add the following to the bottom of your `zig.mod`
-```zig
+```yml
 dependencies:
   - src: git https://github.com/nektro/zig-bencode
 ```
