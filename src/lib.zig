@@ -45,7 +45,20 @@ fn parseInteger(r: anytype, alloc: *std.mem.Allocator) !usize {
 }
 
 fn parseList(r: anytype, alloc: *std.mem.Allocator) ![]Value {
-    return error.Unreachable;
+    var list = std.ArrayList(Value).init(alloc);
+    while (true) {
+        if (peek(r)) |c| {
+            if (c == 'e') {
+                return list.toOwnedSlice();
+            }
+            const v = try parse(r, alloc);
+            try list.append(v);
+        }
+        else {
+            break;
+        }
+    }
+    return error.EndOfStream;
 }
 
 fn parseDict(r: anytype, alloc: *std.mem.Allocator) ![]std.StringArrayHashMap(Value).Entry {
