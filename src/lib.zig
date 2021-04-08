@@ -49,6 +49,7 @@ fn parseList(r: anytype, alloc: *std.mem.Allocator) ![]Value {
     while (true) {
         if (peek(r)) |c| {
             if (c == 'e') {
+                _ = try r.readByte();
                 return list.toOwnedSlice();
             }
             const v = try parse(r, alloc);
@@ -66,6 +67,7 @@ fn parseDict(r: anytype, alloc: *std.mem.Allocator) ![]std.StringArrayHashMap(Va
     while (true) {
         if (peek(r)) |c| {
             if (c == 'e') {
+                _ = try r.readByte();
                 return map.items();
             }
             const k = try parseString(r, alloc);
