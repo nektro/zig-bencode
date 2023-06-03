@@ -66,6 +66,12 @@ pub const Value = union(enum) {
             },
         }
     }
+
+    pub fn getT(self: Value, key: []const u8, comptime tag: std.meta.FieldEnum(Value)) ?std.meta.FieldType(Value, tag) {
+        std.debug.assert(self == .Dictionary);
+        const ret = self.Dictionary.get(key) orelse return null;
+        return if (ret == tag) @field(ret, @tagName(tag)) else null;
+    }
 };
 
 fn peek(r: anytype) ?u8 {
