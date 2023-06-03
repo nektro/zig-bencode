@@ -3,7 +3,7 @@ const std = @import("std");
 pub const Value = union(enum) {
     String: []const u8,
     Integer: i64,
-    List: []Value,
+    List: []const Value,
     Dictionary: std.StringArrayHashMapUnmanaged(Value),
 
     pub fn format(self: Value, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
