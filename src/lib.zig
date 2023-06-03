@@ -82,6 +82,11 @@ fn peek(r: anytype) ?u8 {
 
 const max_number_length = 25;
 
+pub fn parseFixed(input: []const u8, alloc: std.mem.Allocator) !Value {
+    var fbs = std.io.fixedBufferStream(input);
+    return parse(fbs.reader(), alloc);
+}
+
 /// Accepts a {std.io.FixedBufferStream} and a {std.mem.Allocator} to parse a Bencode stream.
 /// @see https://en.wikipedia.org/wiki/Bencode
 pub fn parse(r: anytype, alloc: std.mem.Allocator) anyerror!Value {
