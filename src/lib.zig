@@ -67,70 +67,89 @@ pub const Value = union(enum) {
         }
     }
 
-    pub fn getT(self: Value, key: []const u8, comptime tag: std.meta.FieldEnum(Value)) ?std.meta.FieldType(Value, tag) {
+    fn getT(self: Value, key: []const u8, comptime tag: std.meta.FieldEnum(Value)) ?std.meta.FieldType(Value, tag) {
         std.debug.assert(self == .Dictionary);
         const ret = self.Dictionary.get(key) orelse return null;
         return if (ret == tag) @field(ret, @tagName(tag)) else null;
     }
-};
 
-fn peek(r: anytype) ?u8 {
-    const c = r.context;
-    if (c.pos == c.buffer.len) return null;
-    return c.buffer[c.pos];
-}
+    pub fn getD(self: Value, key: []const u8) ?Value {
+        std.debug.assert(self == .Dictionary);
+        const ret = self.Dictionary.get(key) orelse return null;
+        return if (ret == .Dictionary) ret else null;
+    }
+
+    pub fn getL(self: Value, key: []const u8) ?[]const Value {
+        return self.getT(key, .List);
+    }
+
+    pub fn getS(self: Value, key: []const u8) ?[]const u8 {
+        return self.getT(key, .String);
+    }
+
+    pub fn getI(self: Value, key: []const u8) ?i64 {
+        return self.getT(key, .Integer);
+    }
+
+    pub fn getU(self: Value, key: []const u8) ?u64 {
+        return @intCast(u64, self.getI(key) orelse return null);
+    }
+};
 
 const max_number_length = 25;
 
-pub fn parseFixed(input: []const u8, alloc: std.mem.Allocator) !Value {
+pub fn parseFixed(alloc: std.mem.Allocator, input: []const u8) !Value {
     var fbs = std.io.fixedBufferStream(input);
     return parse(fbs.reader(), alloc);
 }
 
-/// Accepts a {std.io.FixedBufferStream} and a {std.mem.Allocator} to parse a Bencode stream.
-/// @see https://en.wikipedia.org/wiki/Bencode
-pub fn parse(r: anytype, alloc: std.mem.Allocator) anyerror!Value {
-    const pc = peek(r) orelse return error.EndOfStream;
+pub fn parse(r: anytype, alloc: std.mem.Allocator) !Value {
+    var pr = peekableReader(r);
+    return parseInner(&pr, alloc);
+}
+
+fn parseInner(pr: anytype, alloc: std.mem.Allocator) anyerror!Value {
+    const pc = (try pr.peek()) orelse return error.EndOfStream;
     if (pc >= '0' and pc <= '9') return Value{
-        .String = try parseString(r, alloc),
+        .String = try parseString(pr, alloc),
     };
 
-    const t = try r.readByte();
+    const t = try pr.reader().readByte();
     if (t == 'i') return Value{
-        .Integer = try parseInteger(r, alloc),
+        .Integer = try parseInteger(pr, alloc),
     };
     if (t == 'l') return Value{
-        .List = try parseList(r, alloc),
+        .List = try parseList(pr, alloc),
     };
     if (t == 'd') return Value{
-        .Dictionary = try parseDict(r, alloc),
+        .Dictionary = try parseDict(pr, alloc),
     };
     return error.BencodeBadDelimiter;
 }
 
-fn parseString(r: anytype, alloc: std.mem.Allocator) ![]const u8 {
-    const str = try r.readUntilDelimiterAlloc(alloc, ':', max_number_length);
+fn parseString(pr: anytype, alloc: std.mem.Allocator) ![]const u8 {
+    const str = try pr.reader().readUntilDelimiterAlloc(alloc, ':', max_number_length);
     const len = try std.fmt.parseInt(usize, str, 10);
     var buf = try alloc.alloc(u8, len);
-    const l = try r.read(buf);
+    const l = try pr.reader().readAll(buf);
     return buf[0..l];
 }
 
-fn parseInteger(r: anytype, alloc: std.mem.Allocator) !i64 {
-    const str = try r.readUntilDelimiterAlloc(alloc, 'e', max_number_length);
+fn parseInteger(pr: anytype, alloc: std.mem.Allocator) !i64 {
+    const str = try pr.reader().readUntilDelimiterAlloc(alloc, 'e', max_number_length);
     const x = try std.fmt.parseInt(i64, str, 10);
     return x;
 }
 
-fn parseList(r: anytype, alloc: std.mem.Allocator) ![]Value {
+fn parseList(pr: anytype, alloc: std.mem.Allocator) ![]Value {
     var list = std.ArrayList(Value).init(alloc);
     while (true) {
-        if (peek(r)) |c| {
+        if (try pr.peek()) |c| {
             if (c == 'e') {
-                _ = try r.readByte();
+                pr.buf = null;
                 return list.toOwnedSlice();
             }
-            const v = try parse(r, alloc);
+            const v = try parseInner(pr, alloc);
             try list.append(v);
         } else {
             break;
@@ -139,20 +158,62 @@ fn parseList(r: anytype, alloc: std.mem.Allocator) ![]Value {
     return error.EndOfStream;
 }
 
-fn parseDict(r: anytype, alloc: std.mem.Allocator) !std.StringArrayHashMapUnmanaged(Value) {
+fn parseDict(pr: anytype, alloc: std.mem.Allocator) !std.StringArrayHashMapUnmanaged(Value) {
     var map = std.StringArrayHashMapUnmanaged(Value){};
     while (true) {
-        if (peek(r)) |c| {
+        if (try pr.peek()) |c| {
             if (c == 'e') {
-                _ = try r.readByte();
+                pr.buf = null;
                 return map;
             }
-            const k = try parseString(r, alloc);
-            const v = try parse(r, alloc);
+            const k = try parseString(pr, alloc);
+            const v = try parseInner(pr, alloc);
             try map.put(alloc, k, v);
         } else {
             break;
         }
     }
     return error.EndOfStream;
+}
+
+//
+//
+
+fn peekableReader(reader: anytype) PeekableReader(@TypeOf(reader)) {
+    return .{ .child_reader = reader };
+}
+
+fn PeekableReader(comptime ReaderType: type) type {
+    return struct {
+        child_reader: ReaderType,
+        buf: ?u8 = null,
+
+        const Self = @This();
+        pub const Error = ReaderType.Error;
+        pub const Reader = std.io.Reader(*Self, Error, read);
+
+        fn read(self: *Self, dest: []u8) Error!usize {
+            if (self.buf) |c| {
+                dest[0] = c;
+                self.buf = null;
+                return 1;
+            }
+            return self.child_reader.read(dest);
+        }
+
+        pub fn reader(self: *Self) Reader {
+            return .{ .context = self };
+        }
+
+        pub fn peek(self: *Self) !?u8 {
+            if (self.buf) |_| {
+                return self.buf.?;
+            }
+            self.buf = self.child_reader.readByte() catch |err| switch (err) {
+                error.EndOfStream => return null,
+                else => |e| return e,
+            };
+            return self.buf.?;
+        }
+    };
 }
