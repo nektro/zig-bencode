@@ -92,7 +92,7 @@ pub const Value = union(enum) {
     }
 
     pub fn getU(self: Value, key: []const u8) ?u64 {
-        return @intCast(u64, self.getI(key) orelse return null);
+        return @intCast(self.getI(key) orelse return null);
     }
 };
 
