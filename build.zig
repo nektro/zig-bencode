@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const torrent_file = std.Build.path(b, "archlinux-2021.04.01-x86_64.iso.torrent");
+    const torrent_file = b.path("archlinux-2021.04.01-x86_64.iso.torrent");
 
     const bencode = b.addModule("bencode", .{
         .root_source_file = b.path("src/lib.zig"),
