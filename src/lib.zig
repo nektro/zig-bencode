@@ -190,7 +190,7 @@ fn PeekableReader(comptime ReaderType: type) type {
 
         const Self = @This();
         pub const Error = ReaderType.Error;
-        pub const Reader = std.io.Reader(*Self, Error, read);
+        pub const Reader = std.io.GenericReader(*Self, Error, read);
 
         fn read(self: *Self, dest: []u8) Error!usize {
             if (self.buf) |c| {
