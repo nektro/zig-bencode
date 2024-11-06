@@ -1,14 +1,27 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const mode = b.option(std.builtin.Mode, "mode", "") orelse .Debug;
 
+    const torrent_file = b.path("archlinux-2021.04.01-x86_64.iso.torrent");
+
+    const bencode = b.addModule("bencode", .{
+        .root_source_file = b.path("src/lib.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const exe = b.addExecutable(.{
         .name = "zig-bencode",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
-        .optimize = mode,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("bencode", bencode);
+
+    exe.root_module.addAnonymousImport("torrent_file", .{
+        .root_source_file = torrent_file,
     });
 
     b.installArtifact(exe);
