@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const mode = b.option(std.builtin.Mode, "mode", "") orelse .Debug;
+    const optimize = b.standardOptimizeOption(.{});
 
     const torrent_file = b.path("archlinux-2021.04.01-x86_64.iso.torrent");
 
