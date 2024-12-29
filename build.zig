@@ -9,14 +9,14 @@ pub fn build(b: *std.Build) void {
     const bencode = b.addModule("bencode", .{
         .root_source_file = b.path("src/lib.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = mode,
     });
 
     const exe = b.addExecutable(.{
         .name = "zig-bencode",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = mode,
     });
     exe.root_module.addImport("bencode", bencode);
 
