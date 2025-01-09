@@ -6,6 +6,22 @@ pub const Value = union(enum) {
     List: []const Value,
     Dictionary: std.StringArrayHashMapUnmanaged(Value),
 
+    pub fn deinit(self: *const Value, alloc: std.mem.Allocator) void {
+        switch (self.*) {
+            .String => |s| alloc.free(s),
+            .Integer => {},
+            .List => |l| {
+                for (l) |*v| v.deinit(alloc);
+                alloc.free(l);
+            },
+            .Dictionary => |*d| {
+                for (d.keys()) |k| alloc.free(k);
+                for (d.values()) |*v| v.deinit(alloc);
+                @constCast(d).deinit(alloc);
+            },
+        }
+    }
+
     pub fn format(self: Value, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
@@ -129,6 +145,7 @@ fn parseInner(pr: anytype, alloc: std.mem.Allocator) anyerror!Value {
 
 fn parseString(pr: anytype, alloc: std.mem.Allocator) ![]const u8 {
     const str = try pr.reader().readUntilDelimiterAlloc(alloc, ':', max_number_length);
+    defer alloc.free(str);
     const len = try std.fmt.parseInt(usize, str, 10);
     var buf = try alloc.alloc(u8, len);
     const l = try pr.reader().readAll(buf);
@@ -137,12 +154,14 @@ fn parseString(pr: anytype, alloc: std.mem.Allocator) ![]const u8 {
 
 fn parseInteger(pr: anytype, alloc: std.mem.Allocator) !i64 {
     const str = try pr.reader().readUntilDelimiterAlloc(alloc, 'e', max_number_length);
+    defer alloc.free(str);
     const x = try std.fmt.parseInt(i64, str, 10);
     return x;
 }
 
 fn parseList(pr: anytype, alloc: std.mem.Allocator) ![]Value {
     var list = std.ArrayList(Value).init(alloc);
+    errdefer list.deinit();
     while (true) {
         if (try pr.peek()) |c| {
             if (c == 'e') {
@@ -160,6 +179,9 @@ fn parseList(pr: anytype, alloc: std.mem.Allocator) ![]Value {
 
 fn parseDict(pr: anytype, alloc: std.mem.Allocator) !std.StringArrayHashMapUnmanaged(Value) {
     var map = std.StringArrayHashMapUnmanaged(Value){};
+    errdefer map.deinit(alloc);
+    errdefer for (map.keys()) |k| alloc.free(k);
+    errdefer for (map.values()) |v| v.deinit(alloc);
     while (true) {
         if (try pr.peek()) |c| {
             if (c == 'e') {
