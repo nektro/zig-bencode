@@ -7,23 +7,15 @@ pub fn build(b: *std.Build) void {
 
     const torrent_file = b.path("archlinux-2021.04.01-x86_64.iso.torrent");
 
-    const bencode = b.addModule("bencode", .{
-        .root_source_file = b.path("src/lib.zig"),
-        .target = target,
-        .optimize = mode,
-    });
-
     const exe = b.addExecutable(.{
         .name = "zig-bencode",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = mode,
     });
-    exe.root_module.addImport("bencode", bencode);
+    deps.addAllTo(exe);
 
-    exe.root_module.addAnonymousImport("torrent_file", .{
-        .root_source_file = torrent_file,
-    });
+    exe.root_module.addAnonymousImport("torrent_file", .{ .root_source_file = torrent_file });
 
     b.installArtifact(exe);
 
