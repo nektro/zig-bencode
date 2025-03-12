@@ -1,6 +1,8 @@
 .{
-    .name = "bencode",
+    .name = .bencode,
     .version = "0.0.0",
+    .minimum_zig_version = "0.14.0",
+    .fingerprint = 0xa92f3af37987d19f,
     .dependencies = .{},
     .paths = .{
         "build.zig",
