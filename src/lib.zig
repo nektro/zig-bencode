@@ -83,7 +83,7 @@ pub const Value = union(enum) {
         }
     }
 
-    fn getT(self: Value, key: []const u8, comptime tag: std.meta.FieldEnum(Value)) ?std.meta.FieldType(Value, tag) {
+    fn getT(self: Value, key: []const u8, comptime tag: std.meta.FieldEnum(Value)) ?@FieldType(Value, @tagName(tag)) {
         std.debug.assert(self == .Dictionary);
         const ret = self.Dictionary.get(key) orelse return null;
         return if (ret == tag) @field(ret, @tagName(tag)) else null;
@@ -160,7 +160,7 @@ fn parseInteger(pr: anytype, alloc: std.mem.Allocator) !i64 {
 }
 
 fn parseList(pr: anytype, alloc: std.mem.Allocator) ![]Value {
-    var list = std.ArrayList(Value).init(alloc);
+    var list = std.array_list.Managed(Value).init(alloc);
     errdefer list.deinit();
     while (true) {
         if (try pr.peek()) |c| {
