@@ -1,13 +1,14 @@
 const std = @import("std");
 const bencode = @import("bencode");
 const expect = @import("expect").expect;
+const nio = @import("nio");
 
 test {
     const alloc = std.testing.allocator;
     const file = @embedFile("./archlinux-2021.04.01-x86_64.iso.torrent");
 
-    var fbs = std.io.fixedBufferStream(file);
-    const r = fbs.reader();
+    var fbs = nio.FixedBufferStream([]const u8).init(file);
+    const r = &fbs;
     const ben = try bencode.parse(r, alloc);
     defer ben.deinit(alloc);
 
